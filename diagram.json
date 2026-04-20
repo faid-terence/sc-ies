@@ -1,0 +1,214 @@
+{
+  "version": 1,
+  "author": "SC-IES | UR-CST | Terence, Martial, Daniel",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-arduino-mega",
+      "id": "mega",
+      "top": 210,
+      "left": 290,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht1",
+      "top": 30,
+      "left": 60,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-pir-motion-sensor",
+      "id": "pir1",
+      "top": 30,
+      "left": 240,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-lcd1602",
+      "id": "lcd1",
+      "top": 30,
+      "left": 570,
+      "attrs": {
+        "i2c-address": "0x27"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot1",
+      "top": 370,
+      "left": 30,
+      "attrs": {
+        "label": "CO2 Level (MQ-135)"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot2",
+      "top": 470,
+      "left": 30,
+      "attrs": {
+        "label": "Smoke Level (MQ-2)"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot3",
+      "top": 570,
+      "left": 30,
+      "attrs": {
+        "label": "Flood Level (FC-37)"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": 680,
+      "left": 220,
+      "attrs": {
+        "color": "green",
+        "label": "RFID: Authorized"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn2",
+      "top": 680,
+      "left": 400,
+      "attrs": {
+        "color": "red",
+        "label": "RFID: Unauthorized"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 175,
+      "left": 820,
+      "rotate": 90,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": 265,
+      "left": 820,
+      "rotate": 90,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r3",
+      "top": 355,
+      "left": 820,
+      "rotate": 90,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r4",
+      "top": 445,
+      "left": 820,
+      "rotate": 90,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led1",
+      "top": 170,
+      "left": 880,
+      "attrs": {
+        "color": "yellow",
+        "label": "LIGHT"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led2",
+      "top": 260,
+      "left": 880,
+      "attrs": {
+        "color": "blue",
+        "label": "FAN"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led3",
+      "top": 350,
+      "left": 880,
+      "attrs": {
+        "color": "green",
+        "label": "DOOR"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led4",
+      "top": 440,
+      "left": 880,
+      "attrs": {
+        "color": "red",
+        "label": "ALERT"
+      }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "buzz1",
+      "top": 540,
+      "left": 880,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    ["dht1:VCC", "mega:5V",    "red",    []],
+    ["dht1:GND", "mega:GND.1", "black",  []],
+    ["dht1:SDA", "mega:3",     "green",  []],
+
+    ["pir1:VCC", "mega:5V",    "red",    []],
+    ["pir1:GND", "mega:GND.1", "black",  []],
+    ["pir1:OUT", "mega:2",     "orange", []],
+
+    ["lcd1:VCC", "mega:5V",    "red",    []],
+    ["lcd1:GND", "mega:GND.2", "black",  []],
+    ["lcd1:SDA", "mega:20",    "blue",   []],
+    ["lcd1:SCL", "mega:21",    "purple", []],
+
+    ["pot1:VCC", "mega:5V",    "red",    []],
+    ["pot1:GND", "mega:GND.2", "black",  []],
+    ["pot1:SIG", "mega:A0",    "orange", []],
+
+    ["pot2:VCC", "mega:5V",    "red",    []],
+    ["pot2:GND", "mega:GND.2", "black",  []],
+    ["pot2:SIG", "mega:A1",    "orange", []],
+
+    ["pot3:VCC", "mega:5V",    "red",    []],
+    ["pot3:GND", "mega:GND.3", "black",  []],
+    ["pot3:SIG", "mega:A2",    "orange", []],
+
+    ["btn1:1.l", "mega:22",    "green",  []],
+    ["btn1:2.l", "mega:GND.2", "black",  []],
+
+    ["btn2:1.l", "mega:23",    "red",    []],
+    ["btn2:2.l", "mega:GND.3", "black",  []],
+
+    ["mega:4",   "r1:1",       "yellow", []],
+    ["r1:2",     "led1:A",     "yellow", []],
+    ["led1:K",   "mega:GND.3", "black",  []],
+
+    ["mega:5",   "r2:1",       "cyan",   []],
+    ["r2:2",     "led2:A",     "cyan",   []],
+    ["led2:K",   "mega:GND.3", "black",  []],
+
+    ["mega:6",   "r3:1",       "green",  []],
+    ["r3:2",     "led3:A",     "green",  []],
+    ["led3:K",   "mega:GND.3", "black",  []],
+
+    ["mega:7",   "r4:1",       "red",    []],
+    ["r4:2",     "led4:A",     "red",    []],
+    ["led4:K",   "mega:GND.3", "black",  []],
+
+    ["mega:8",   "buzz1:1",    "purple", []],
+    ["buzz1:2",  "mega:GND.3", "black",  []]
+  ]
+}
