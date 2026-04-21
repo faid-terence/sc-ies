@@ -166,6 +166,21 @@ def rfid_scan(data):
             }
             log_mqtt("rfid/attendance",
                 f'{{"student":"{student["name"]}","card":"{student["card"]}","status":"GRANTED"}}')
+
+            # Unlock door and emit immediately so dashboard shows UNLOCKED
+            state["door_locked"] = False
+            socketio.emit("state_update", state)
+
+            # Re-lock after 5 seconds in a background thread (non-blocking)
+            def relock():
+                time.sleep(5)
+                with lock:
+                    state["door_locked"] = True
+                    log_mqtt("actuator/control",
+                        '{"device":"door","state":"LOCKED","reason":"auto_relock"}')
+                    socketio.emit("state_update", state)
+            threading.Thread(target=relock, daemon=True).start()
+
         else:
             entry = {
                 "time":   datetime.now().strftime("%H:%M:%S"),
