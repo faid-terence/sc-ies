@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SC-IES — Room 101 Dashboard</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── Reset & Base ──────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #1c2128;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --dim:       #8b949e;
+      --green:     #3fb950;
+      --green-bg:  #0d2818;
+      --yellow:    #d29922;
+      --yellow-bg: #2d1f00;
+      --red:       #f85149;
+      --red-bg:    #2d0f0e;
+      --blue:      #58a6ff;
+      --blue-bg:   #0d1f38;
+      --purple:    #bc8cff;
+      --radius:    10px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header-left h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+    .header-left span {
+      font-size: 12px;
+      color: var(--dim);
+      margin-left: 10px;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--green);
+      font-weight: 600;
+    }
+    .live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+    #clock { font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    main {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 20px 24px;
+      display: grid;
+      gap: 16px;
+    }
+
+    /* ── Cards ──────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--dim);
+      margin-bottom: 12px;
+    }
+
+    /* ── Stat Cards Row ─────────────────────────────────────── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color 0.3s;
+    }
+    .stat-card.occupied  { border-color: var(--green); background: var(--green-bg); }
+    .stat-card.warning   { border-color: var(--yellow); background: var(--yellow-bg); }
+    .stat-card.danger    { border-color: var(--red); background: var(--red-bg); }
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--dim);
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-value.green  { color: var(--green); }
+    .stat-value.yellow { color: var(--yellow); }
+    .stat-value.red    { color: var(--red); }
+    .stat-value.blue   { color: var(--blue); }
+    .stat-value.dim    { color: var(--dim); }
+    .stat-unit { font-size: 14px; font-weight: 400; color: var(--dim); }
+    .stat-sub  { font-size: 12px; color: var(--dim); }
+
+    /* ── Mid Row ─────────────────────────────────────────────── */
+    .mid-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* Actuators */
+    .actuator-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .actuator-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .actuator-name {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .actuator-icon { font-size: 18px; }
+    .badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-on     { background: var(--green-bg);  color: var(--green);  border: 1px solid var(--green); }
+    .badge-off    { background: var(--surface2);  color: var(--dim);    border: 1px solid var(--border); }
+    .badge-locked { background: var(--blue-bg);   color: var(--blue);   border: 1px solid var(--blue); }
+    .badge-open   { background: var(--yellow-bg); color: var(--yellow); border: 1px solid var(--yellow); }
+
+    /* Alert panel */
+    .alert-box {
+      border-radius: 8px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 140px;
+      transition: all 0.3s;
+    }
+    .alert-box.none     { background: var(--surface2); border: 1px dashed var(--border); }
+    .alert-box.fire     { background: var(--red-bg);    border: 1px solid var(--red);    animation: flash 0.8s infinite; }
+    .alert-box.flood    { background: var(--blue-bg);   border: 1px solid var(--blue);   animation: flash 0.8s infinite; }
+    .alert-box.unauth   { background: var(--yellow-bg); border: 1px solid var(--yellow); }
+    @keyframes flash {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.7; }
+    }
+    .alert-icon  { font-size: 36px; margin-bottom: 8px; }
+    .alert-type  { font-size: 20px; font-weight: 700; }
+    .alert-level { font-size: 12px; color: var(--dim); margin-top: 4px; }
+
+    /* ── Bottom Row ──────────────────────────────────────────── */
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* Attendance table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      text-align: left;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--dim);
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    tr.new-row { animation: slideIn 0.4s ease; }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .status-granted { color: var(--green); font-weight: 600; }
+    .status-denied  { color: var(--red);   font-weight: 600; }
+    .empty-msg { text-align: center; color: var(--dim); padding: 24px; }
+
+    /* Energy chart */
+    .energy-stats {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 10px;
+    }
+    .energy-stat { text-align: center; }
+    .energy-stat .val { font-size: 20px; font-weight: 700; }
+    .energy-stat .lbl { font-size: 11px; color: var(--dim); margin-top: 2px; }
+    .savings-badge {
+      text-align: center;
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--green);
+      margin-top: 8px;
+    }
+
+    /* ── Demo Controls ───────────────────────────────────────── */
+    .controls {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .controls-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--dim);
+      margin-bottom: 14px;
+    }
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .ctrl-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+    .ctrl-group label {
+      font-size: 12px;
+      color: var(--dim);
+      white-space: nowrap;
+    }
+    .ctrl-group input[type=range] {
+      width: 100px;
+      accent-color: var(--red);
+    }
+    .ctrl-group span {
+      font-size: 12px;
+      font-weight: 600;
+      width: 30px;
+      font-variant-numeric: tabular-nums;
+    }
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-green  { background: var(--green-bg);  color: var(--green);  border-color: var(--green); }
+    .btn-red    { background: var(--red-bg);    color: var(--red);    border-color: var(--red); }
+    .btn-blue   { background: var(--blue-bg);   color: var(--blue);   border-color: var(--blue); }
+    .btn-yellow { background: var(--yellow-bg); color: var(--yellow); border-color: var(--yellow); }
+    .btn-dim    { background: var(--surface2);  color: var(--dim);    border-color: var(--border); }
+
+    /* ── MQTT Log ────────────────────────────────────────────── */
+    .mqtt-log {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .mqtt-entry {
+      display: grid;
+      grid-template-columns: 70px 1fr;
+      gap: 8px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      animation: slideIn 0.3s ease;
+    }
+    .mqtt-entry:last-child { border-bottom: none; }
+    .mqtt-time    { color: var(--dim); }
+    .mqtt-topic   { color: var(--purple); }
+    .mqtt-payload { color: var(--dim); font-size: 11px; margin-top: 1px; }
+
+    /* ── Responsive ──────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .stat-grid   { grid-template-columns: repeat(2, 1fr); }
+      .mid-grid    { grid-template-columns: 1fr; }
+      .bottom-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────── -->
+<header>
+  <div class="header-left">
+    <h1>🏫 SC-IES Dashboard</h1>
+    <span>Room 101 · UR-CST Block B</span>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="live-dot"></div> LIVE</div>
+    <div id="clock">--:--:--</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Stat Cards ────────────────────────────────────────────────── -->
+  <div class="stat-grid">
+    <div class="stat-card" id="card-occupancy">
+      <div class="stat-label">Occupancy</div>
+      <div class="stat-value dim" id="stat-occupied">EMPTY</div>
+      <div class="stat-sub" id="stat-occ-sub">No motion detected</div>
+    </div>
+    <div class="stat-card" id="card-temp">
+      <div class="stat-label">Temperature</div>
+      <div class="stat-value blue" id="stat-temp">--.-<span class="stat-unit">°C</span></div>
+      <div class="stat-sub" id="stat-temp-sub">Normal</div>
+    </div>
+    <div class="stat-card" id="card-hum">
+      <div class="stat-label">Humidity</div>
+      <div class="stat-value blue" id="stat-hum">--.-<span class="stat-unit">%</span></div>
+      <div class="stat-sub">DHT22 Sensor</div>
+    </div>
+    <div class="stat-card" id="card-co2">
+      <div class="stat-label">CO₂ Level</div>
+      <div class="stat-value blue" id="stat-co2">---<span class="stat-unit"> ppm</span></div>
+      <div class="stat-sub" id="stat-co2-sub">Normal</div>
+    </div>
+  </div>
+
+  <!-- ── Actuators + Alert ─────────────────────────────────────────── -->
+  <div class="mid-grid">
+
+    <div class="card">
+      <div class="card-title">Actuators — Relay Control</div>
+      <div class="actuator-list">
+        <div class="actuator-item">
+          <div class="actuator-name">
+            <span class="actuator-icon">💡</span> Classroom Lights
+          </div>
+          <span class="badge badge-off" id="act-lights">OFF</span>
+        </div>
+        <div class="actuator-item">
+          <div class="actuator-name">
+            <span class="actuator-icon">🌀</span> Fan / AC Unit
+          </div>
+          <span class="badge badge-off" id="act-fan">OFF</span>
+        </div>
+        <div class="actuator-item">
+          <div class="actuator-name">
+            <span class="actuator-icon">🔒</span> Door Lock
+          </div>
+          <span class="badge badge-locked" id="act-door">LOCKED</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Security & Alerts</div>
+      <div class="alert-box none" id="alert-box">
+        <div class="alert-icon">✅</div>
+        <div class="alert-type" style="color:var(--green)">All Clear</div>
+        <div class="alert-level">No active alerts</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Attendance + Energy ───────────────────────────────────────── -->
+  <div class="bottom-grid">
+
+    <div class="card">
+      <div class="card-title">Attendance Log — RFID RC522</div>
+      <div id="attendance-wrap">
+        <div class="empty-msg">No scans yet — press RFID Auth to log a student</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Energy Usage — Always-On vs SC-IES</div>
+      <canvas id="energyChart" height="140"></canvas>
+      <div class="energy-stats">
+        <div class="energy-stat">
+          <div class="val" id="e-always" style="color:var(--red)">0.000</div>
+          <div class="lbl">Always-On (Wh)</div>
+        </div>
+        <div class="energy-stat">
+          <div class="val" id="e-scies" style="color:var(--green)">0.000</div>
+          <div class="lbl">SC-IES (Wh)</div>
+        </div>
+        <div class="energy-stat">
+          <div class="val" id="e-savings" style="color:var(--blue)">0%</div>
+          <div class="lbl">Savings</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Demo Controls ─────────────────────────────────────────────── -->
+  <div class="controls">
+    <div class="controls-title">🎮 Demo Controls — Simulate Sensor Events</div>
+    <div class="controls-row">
+
+      <button class="btn btn-green" onclick="toggleOccupancy()">
+        🚶 Toggle PIR Motion
+      </button>
+      <button class="btn btn-blue" onclick="rfidScan(true)">
+        🪪 RFID — Authorized
+      </button>
+      <button class="btn btn-yellow" onclick="rfidScan(false)">
+        🚫 RFID — Unauthorized
+      </button>
+
+      <div class="ctrl-group">
+        <label>🔥 Smoke</label>
+        <input type="range" min="0" max="100" value="4" id="smoke-slider"
+               oninput="setSmoke(this.value)"/>
+        <span id="smoke-val">4%</span>
+      </div>
+
+      <div class="ctrl-group">
+        <label>💧 Flood</label>
+        <input type="range" min="0" max="100" value="2" id="flood-slider"
+               oninput="setFlood(this.value)"/>
+        <span id="flood-val">2%</span>
+      </div>
+
+      <button class="btn btn-dim" onclick="clearAlert()">
+        ✅ Clear Alert
+      </button>
+
+    </div>
+  </div>
+
+  <!-- ── MQTT Log ──────────────────────────────────────────────────── -->
+  <div class="card">
+    <div class="card-title">MQTT Message Log — campus/CST/room101/…</div>
+    <div class="mqtt-log" id="mqtt-log">
+      <div class="mqtt-entry">
+        <span class="mqtt-time">--:--:--</span>
+        <div>
+          <div class="mqtt-topic">Waiting for messages…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // ── Socket ────────────────────────────────────────────────────────
+  const socket = io();
+
+  // ── Clock ─────────────────────────────────────────────────────────
+  function updateClock() {
+    document.getElementById('clock').textContent =
+      new Date().toLocaleTimeString('en-GB');
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ── Energy Chart ──────────────────────────────────────────────────
+  const energyChart = new Chart(document.getElementById('energyChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Always-On Baseline', 'SC-IES Controlled'],
+      datasets: [{
+        data: [0, 0],
+        backgroundColor: ['rgba(248,81,73,0.3)', 'rgba(63,185,80,0.3)'],
+        borderColor:     ['#f85149', '#3fb950'],
+        borderWidth: 2,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#8b949e', font: { size: 11 } },
+          grid:  { color: '#21262d' },
+          title: { display: true, text: 'Energy (Wh)', color: '#8b949e', font: { size: 11 } }
+        },
+        x: {
+          ticks: { color: '#8b949e', font: { size: 11 } },
+          grid:  { color: '#21262d' }
+        }
+      }
+    }
+  });
+
+  // ── State Update ──────────────────────────────────────────────────
+  socket.on('state_update', (s) => {
+    updateStats(s);
+    updateActuators(s);
+    updateAlert(s);
+    updateAttendance(s.attendance);
+    updateEnergy(s);
+    updateMqttLog(s.mqtt_log);
+  });
+
+  function updateStats(s) {
+    // Occupancy card
+    const occCard = document.getElementById('card-occupancy');
+    const occVal  = document.getElementById('stat-occupied');
+    const occSub  = document.getElementById('stat-occ-sub');
+    if (s.occupied) {
+      occCard.className = 'stat-card occupied';
+      occVal.className  = 'stat-value green';
+      occVal.textContent = 'OCCUPIED';
+      occSub.textContent = 'PIR motion active';
+    } else {
+      occCard.className = 'stat-card';
+      occVal.className  = 'stat-value dim';
+      occVal.textContent = 'EMPTY';
+      occSub.textContent = 'No motion detected';
+    }
+
+    // Temperature
+    const tempCard = document.getElementById('card-temp');
+    const tempVal  = document.getElementById('stat-temp');
+    const tempSub  = document.getElementById('stat-temp-sub');
+    tempVal.innerHTML = `${s.temp.toFixed(1)}<span class="stat-unit">°C</span>`;
+    if (s.temp > 30) {
+      tempCard.className = 'stat-card danger';
+      tempVal.className  = 'stat-value red';
+      tempSub.textContent = 'High — fan activated';
+    } else if (s.temp > 27) {
+      tempCard.className = 'stat-card warning';
+      tempVal.className  = 'stat-value yellow';
+      tempSub.textContent = 'Warm — fan on';
+    } else {
+      tempCard.className = 'stat-card';
+      tempVal.className  = 'stat-value blue';
+      tempSub.textContent = 'Comfortable';
+    }
+
+    // Humidity
+    document.getElementById('stat-hum').innerHTML =
+      `${s.hum.toFixed(1)}<span class="stat-unit">%</span>`;
+
+    // CO2
+    const co2Card = document.getElementById('card-co2');
+    const co2Val  = document.getElementById('stat-co2');
+    const co2Sub  = document.getElementById('stat-co2-sub');
+    co2Val.innerHTML = `${s.co2}<span class="stat-unit"> ppm</span>`;
+    if (s.co2 >= 1200) {
+      co2Card.className = 'stat-card danger';
+      co2Val.className  = 'stat-value red';
+      co2Sub.textContent = 'Critical — ventilate now';
+    } else if (s.co2 >= 800) {
+      co2Card.className = 'stat-card warning';
+      co2Val.className  = 'stat-value yellow';
+      co2Sub.textContent = 'Warning — fan forced on';
+    } else {
+      co2Card.className = 'stat-card';
+      co2Val.className  = 'stat-value blue';
+      co2Sub.textContent = 'Normal';
+    }
+  }
+
+  function updateActuators(s) {
+    const lights = document.getElementById('act-lights');
+    lights.textContent = s.lights ? 'ON' : 'OFF';
+    lights.className   = s.lights ? 'badge badge-on' : 'badge badge-off';
+
+    const fan = document.getElementById('act-fan');
+    fan.textContent = s.fan ? 'ON' : 'OFF';
+    fan.className   = s.fan ? 'badge badge-on' : 'badge badge-off';
+
+    const door = document.getElementById('act-door');
+    door.textContent = s.door_locked ? 'LOCKED' : 'UNLOCKED';
+    door.className   = s.door_locked ? 'badge badge-locked' : 'badge badge-open';
+  }
+
+  function updateAlert(s) {
+    const box = document.getElementById('alert-box');
+    if (!s.alert) {
+      box.className = 'alert-box none';
+      box.innerHTML = `
+        <div class="alert-icon">✅</div>
+        <div class="alert-type" style="color:var(--green)">All Clear</div>
+        <div class="alert-level">No active alerts</div>`;
+    } else if (s.alert.type === 'FIRE') {
+      box.className = 'alert-box fire';
+      box.innerHTML = `
+        <div class="alert-icon">🔥</div>
+        <div class="alert-type" style="color:var(--red)">FIRE ALERT</div>
+        <div class="alert-level">Smoke level: ${s.alert.level}% · EVACUATE NOW</div>`;
+    } else if (s.alert.type === 'FLOOD') {
+      box.className = 'alert-box flood';
+      box.innerHTML = `
+        <div class="alert-icon">💧</div>
+        <div class="alert-type" style="color:var(--blue)">FLOOD ALERT</div>
+        <div class="alert-level">Flood level: ${s.alert.level}% · EVACUATE NOW</div>`;
+    } else if (s.alert.type === 'UNAUTHORIZED_ACCESS') {
+      box.className = 'alert-box unauth';
+      box.innerHTML = `
+        <div class="alert-icon">🚫</div>
+        <div class="alert-type" style="color:var(--yellow)">UNAUTHORIZED ACCESS</div>
+        <div class="alert-level">Unknown RFID card · Security notified</div>`;
+    }
+  }
+
+  let prevAttendanceLen = 0;
+  function updateAttendance(list) {
+    const wrap = document.getElementById('attendance-wrap');
+    if (!list || list.length === 0) {
+      wrap.innerHTML = '<div class="empty-msg">No scans yet — press RFID Auth to log a student</div>';
+      return;
+    }
+    const isNew = list.length > prevAttendanceLen;
+    prevAttendanceLen = list.length;
+    wrap.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th><th>Student</th><th>Card ID</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${list.map((e, i) => `
+            <tr class="${i === 0 && isNew ? 'new-row' : ''}">
+              <td>${e.time}</td>
+              <td>${e.name}</td>
+              <td style="font-family:monospace;color:var(--dim)">${e.card}</td>
+              <td class="${e.status === 'GRANTED' ? 'status-granted' : 'status-denied'}">
+                ${e.status === 'GRANTED' ? '✓ GRANTED' : '✗ DENIED'}
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function updateEnergy(s) {
+    const always = s.energy_always_on;
+    const scies  = s.energy_sc_ies;
+    const savings = always > 0 ? Math.round((1 - scies / always) * 100) : 0;
+
+    document.getElementById('e-always').textContent  = always.toFixed(3);
+    document.getElementById('e-scies').textContent   = scies.toFixed(3);
+    document.getElementById('e-savings').textContent = savings + '%';
+
+    energyChart.data.datasets[0].data = [always, scies];
+    energyChart.update('none');
+  }
+
+  let prevMqttLen = 0;
+  function updateMqttLog(log) {
+    if (!log || log.length === 0) return;
+    if (log.length === prevMqttLen) return;
+    prevMqttLen = log.length;
+    document.getElementById('mqtt-log').innerHTML = log.map((e, i) => `
+      <div class="mqtt-entry">
+        <span class="mqtt-time">${e.time}</span>
+        <div>
+          <div class="mqtt-topic">${e.topic}</div>
+          <div class="mqtt-payload">${e.payload}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── Demo Control Handlers ─────────────────────────────────────────
+  function toggleOccupancy() { socket.emit('toggle_occupancy'); }
+  function rfidScan(auth)    { socket.emit('rfid_scan', { authorized: auth }); }
+  function clearAlert()      { socket.emit('clear_alert'); }
+
+  function setSmoke(v) {
+    document.getElementById('smoke-val').textContent = v + '%';
+    socket.emit('set_smoke', { value: parseInt(v) });
+  }
+  function setFlood(v) {
+    document.getElementById('flood-val').textContent = v + '%';
+    socket.emit('set_flood', { value: parseInt(v) });
+  }
+</script>
+
+</body>
+</html>
